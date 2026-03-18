@@ -7,8 +7,7 @@ Provide secure, identity-based access to internal infrastructure using a Zero Tr
 ---
 
 ## High-Level Topology
-
-\`\`\`
+```
 Remote Client
       │
       ▼
@@ -22,7 +21,7 @@ Subnet Router (Pi-hole)
       │
       ▼
 Core Services
-\`\`\`
+```
 
 ---
 
@@ -38,12 +37,12 @@ Core Services
 - No traffic permitted without valid identity
 
 ### Subnet Router (Pi-hole)
-- Advertises \`192.168.10.0/24\` into the Tailscale overlay
+- Advertises `192.168.10.0/24` into the Tailscale overlay
 - Performs NAT for return traffic back to remote clients
 - Provides DNS filtering for all enrolled nodes
 
 ### Internal Network
-- Subnet: \`192.168.10.0/24\`
+- Subnet: `192.168.10.0/24`
 - Private and non-routable from the internet
 - Only reachable via authenticated overlay nodes
 
@@ -59,10 +58,9 @@ Core Services
 ---
 
 ## Access Flow
-
-\`\`\`
+```
 Client → Authenticate → Tailscale Tunnel → ACL Evaluation → Subnet Router → Internal Service
-\`\`\`
+```
 
 ---
 
@@ -72,11 +70,11 @@ Default policy: **deny all**
 
 | Tag | Access |
 |---|---|
-| \`tag:admin\` | Full subnet — \`192.168.10.0/24:*\` |
-| \`tag:dns\` | DNS only — \`192.168.10.5:53\` |
-| \`tag:monitor\` | Observability — Grafana \`:3000\`, Prometheus \`:9090\` |
+| `tag:admin` | Full subnet — `192.168.10.0/24:*` |
+| `tag:dns` | DNS only — `192.168.10.5:53` |
+| `tag:monitor` | Observability — Grafana `:3000`, Prometheus `:9090` |
 
-Full policy: [\`configs/tailscale/acl.json\`](../configs/tailscale/acl.json)
+Full policy: [`configs/tailscale/acl.json`](../configs/tailscale/acl.json)
 
 ---
 
