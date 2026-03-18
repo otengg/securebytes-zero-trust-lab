@@ -112,4 +112,4 @@ Access policies are enforced using Tailscale ACLs with tag-based segmentation.
 
 ## Author
 
-**Gideon Oteng** — [SecureBytes](https://github.com/securebytes)
+**Gideon Oteng** — [github.com/otengg](https://github.com/otengg)
