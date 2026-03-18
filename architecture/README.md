@@ -1,99 +1,94 @@
 # Architecture
 
-## Network Topology
+## Objective
 
-```
-                    ┌─────────────────────────────────────┐
-                    │       TAILSCALE OVERLAY MESH        │
-                    │        100.x.x.x / WireGuard        │
-                    └──────────────┬──────────────────────┘
-                                   │
-                        ┌──────────▼──────────┐
-                        │    Remote Client     │
-                        │    (any location)    │
-                        └──────────┬──────────┘
-                                   │ Tailscale tunnel
-                        ┌──────────▼──────────┐
-                        │     pihole-01        │
-                        │   192.168.10.5       │
-                        │   Subnet Router      │
-                        │   + DNS filtering    │
-                        └──────────┬──────────┘
-                                   │ 192.168.10.0/24
-       ┌───────────────────────────┼───────────────────────────┐
-       │                           │                           │
-┌──────▼────────┐     ┌────────────▼──────────┐   ┌───────────▼───────────┐
-│  ava-dc-01    │     │  Observability Stack   │   │  CML / Automation     │
-│ 192.168.10.10 │     │  .20 Security Onion    │   │  .40 CML 2.9          │
-│  Proxmox VE   │     │  .21 Wazuh             │   │  .50 python-auto      │
-│  Hypervisor   │     │  .22 Splunk            │   └───────────────────────┘
-└───────────────┘     └────────────────────────┘
-
-┌──────────────────────────────────────────┐
-│  Kubernetes Cluster                      │
-│  k8s-01  192.168.10.30                  │
-│  k8s-02  192.168.10.31                  │
-│  k8s-03  192.168.10.32                  │
-└──────────────────────────────────────────┘
-```
+Provide secure, identity-based access to internal infrastructure using a Zero Trust model with no public exposure.
 
 ---
 
-## Zero Trust Access Flow
+## High-Level Topology
 
-```
-1. Remote client authenticates to Tailscale (identity provider)
-         │
-         ▼
-2. Tailscale issues WireGuard keypair, verifies node tags
-         │
-         ▼
-3. Encrypted WireGuard tunnel established (overlay)
-         │
-         ▼
-4. ACL evaluated — tag:admin / tag:monitor / tag:dns
-         │
-         ▼
-5. Subnet router (pihole-01) forwards into 192.168.10.0/24
-         │
-         ▼
-6. NAT applied for return traffic back to overlay client
-         │
-         ▼
-7. Internal service reached — SSH / Grafana / Prometheus / DNS
-```
+\`\`\`
+Remote Client
+      │
+      ▼
+Tailscale (WireGuard Overlay)
+      │
+      ▼
+Subnet Router (Pi-hole)
+      │
+      ▼
+192.168.10.0/24 Network
+      │
+      ▼
+Core Services
+\`\`\`
 
 ---
 
-## ACL Segmentation
+## Core Components
 
-```
-┌──────────────────────────────────────────────────────┐
-│               TAILSCALE ACL (deny by default)        │
-│                                                      │
-│  tag:admin   ────────────────► 192.168.10.0/24:*    │
-│                                                      │
-│  tag:dns     ────────────────► 192.168.10.5:53      │
-│                                                      │
-│  tag:monitor ────────────────► :3000  :9090  :9093  │
-│                                                      │
-│  (untagged)  ────────────────► DENY                 │
-└──────────────────────────────────────────────────────┘
-```
+### Remote Client
+- Authenticated device (Mac, laptop, mobile)
+- Connects via Tailscale identity — no credentials, no static keys
 
----
+### Tailscale Overlay
+- WireGuard-based encrypted mesh
+- Enforces ACL-based access control per node tag
+- No traffic permitted without valid identity
 
-## Node Reference
+### Subnet Router (Pi-hole)
+- Advertises \`192.168.10.0/24\` into the Tailscale overlay
+- Performs NAT for return traffic back to remote clients
+- Provides DNS filtering for all enrolled nodes
 
-| Hostname | Role | IP |
+### Internal Network
+- Subnet: \`192.168.10.0/24\`
+- Private and non-routable from the internet
+- Only reachable via authenticated overlay nodes
+
+### Core Services
+
+| Service | Role | IP |
 |---|---|---|
-| `pihole-01` | Subnet router + DNS | 192.168.10.5 |
-| `ava-dc-01` | Proxmox hypervisor | 192.168.10.10 |
-| `sec-onion-01` | Security Onion (IDS/NSM) | 192.168.10.20 |
-| `wazuh-01` | SIEM / EDR manager | 192.168.10.21 |
-| `splunk-01` | Log aggregation | 192.168.10.22 |
-| `k8s-01` | Kubernetes node | 192.168.10.30 |
-| `k8s-02` | Kubernetes node | 192.168.10.31 |
-| `k8s-03` | Kubernetes node | 192.168.10.32 |
-| `cml-01` | Cisco Modeling Labs | 192.168.10.40 |
-| `python-automation` | Network automation VM | 192.168.10.50 |
+| Proxmox | Infrastructure management | 192.168.10.10 |
+| Grafana | Observability dashboard | 192.168.10.21 |
+| Prometheus | Metrics collection | 192.168.10.21 |
+| Pi-hole | DNS filtering + subnet router | 192.168.10.5 |
+
+---
+
+## Access Flow
+
+\`\`\`
+Client → Authenticate → Tailscale Tunnel → ACL Evaluation → Subnet Router → Internal Service
+\`\`\`
+
+---
+
+## Access Control Model
+
+Default policy: **deny all**
+
+| Tag | Access |
+|---|---|
+| \`tag:admin\` | Full subnet — \`192.168.10.0/24:*\` |
+| \`tag:dns\` | DNS only — \`192.168.10.5:53\` |
+| \`tag:monitor\` | Observability — Grafana \`:3000\`, Prometheus \`:9090\` |
+
+Full policy: [\`configs/tailscale/acl.json\`](../configs/tailscale/acl.json)
+
+---
+
+## Design Decisions
+
+- **No traditional VPN** — subnet routing avoids full tunnel exposure
+- **No port forwarding** — zero public-facing services or inbound rules
+- **Centralized entry** — all overlay traffic enters through the Pi-hole subnet router
+- **Identity-based segmentation** — access scoped per tag, not per IP or firewall rule
+
+---
+
+## Scope Note
+
+This architecture documents the secure access and observability layer of the SecureBytes lab. Additional components — SIEM, Kubernetes, CML, and network automation — are maintained in separate repositories.
