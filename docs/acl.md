@@ -1,3 +1,7 @@
+# Tailscale ACL
+
+## Example
+
 {
   "tagOwners": {
     "tag:admin": ["autogroup:admin"],
