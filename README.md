@@ -1,157 +1,147 @@
-# 🔐 SecureBytes — Zero Trust Lab
+# SecureBytes — Zero Trust Lab
 
-> Identity-based access to a private homelab using Tailscale.
-> No inbound ports. No legacy VPN. No implicit trust.
+Identity-based remote access to private infrastructure using Tailscale.
+No public exposure. No legacy VPN. No implicit trust.
 
-![WireGuard](https://img.shields.io/badge/Transport-WireGuard-orange?style=flat-square)
-![Tailscale](https://img.shields.io/badge/Overlay-Tailscale-blue?style=flat-square)
-![Zero Trust](https://img.shields.io/badge/Model-Zero%20Trust-brightgreen?style=flat-square)
-![Subnet](https://img.shields.io/badge/Subnet-192.168.10.0%2F24-lightgrey?style=flat-square)
-![Status](https://img.shields.io/badge/Status-Active-success?style=flat-square)
-
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Design Principles](#design-principles)
-- [Access Control Model](#access-control-model)
-- [Implementation](#implementation)
-- [Operational Notes](#operational-notes)
-- [Current Capabilities](#current-capabilities)
-- [Visual Proof](#visual-proof)
-- [Next Steps](#next-steps)
-- [Documentation](#documentation)
+![](https://img.shields.io/badge/Transport-WireGuard-orange?style=flat-square)
+![](https://img.shields.io/badge/Overlay-Tailscale-blue?style=flat-square)
+![](https://img.shields.io/badge/Model-Zero%20Trust-brightgreen?style=flat-square)
+![](https://img.shields.io/badge/Status-Active-success?style=flat-square)
 
 ---
 
-## Overview
+## Problem Statement
 
-This repository documents the design and implementation of a Zero Trust access model for a private homelab using Tailscale as the overlay network.
+Traditional VPN access requires open inbound ports, static credentials, and implicit trust once inside the network perimeter. This creates unnecessary attack surface for a private lab environment that requires secure remote access from untrusted networks.
 
-Access is granted based on **identity and policy** — not network location. Services remain private and unreachable from the public internet, with no inbound ports opened on the edge.
+## Solution
+
+A WireGuard-based overlay network (Tailscale) provides identity-verified, policy-enforced access to internal services — with zero public exposure and no changes to the upstream network.
 
 ---
 
 ## Architecture
-
 ```
 Remote Client
       │
-      │  WireGuard encrypted tunnel (Tailscale overlay)
+      │  WireGuard / Tailscale overlay
       ▼
-Tailscale Coordination + Identity Verification
+Identity Verification + ACL Evaluation
       │
-      │  Tag-based ACL evaluated
       ▼
-Subnet Router — pihole-01 (192.168.10.5)
+Subnet Router  ·  192.168.10.5
       │
-      │  Route advertisement + NAT
+      │  NAT + route advertisement
       ▼
-192.168.10.0/24 — Internal Services
+Internal Services  ·  192.168.10.0/24
 ```
 
-![Zero Trust Architecture](assets/diagrams/zt-architecture.png)
+![Architecture](assets/zt-architecture.png)
 
 ---
 
-## Design Principles
+## Access Control
 
-| Principle | Description |
+Policy is deny-by-default. All access is explicit and tag-scoped.
+
+| Tag | Grants Access To |
 |---|---|
-| **Zero Trust Access** | Access granted on identity and policy — never network location |
-| **No Public Exposure** | Zero inbound ports opened on the edge network |
-| **Minimal Attack Surface** | Services only reachable through the overlay network |
-| **Policy Segmentation** | Tag-based ACLs enforce least-privilege at the service level |
+| `tag:admin` | Full subnet — all hosts, all ports |
+| `tag:dns` | Pi-hole DNS — port 53 only |
+| `tag:monitor` | Grafana · Prometheus · Alertmanager |
 
----
-
-## Access Control Model
-
-Policies are enforced using Tailscale ACLs. The model is **deny-by-default** — all access is explicit.
-
-| Tag | Scope | Services |
-|---|---|---|
-| `tag:admin` | Full subnet | `192.168.10.0/24` — all hosts, all ports |
-| `tag:dns` | DNS only | Pi-hole — port `53` UDP/TCP |
-| `tag:monitor` | Observability stack | Grafana `:3000`, Prometheus `:9090`, Alertmanager `:9093` |
-
-ACL source: [`configs/tailscale/acl.json`](configs/tailscale/acl.json)
+Full policy: [`acl.json`](acl.json)
 
 ---
 
 ## Implementation
 
-- [x] Tailscale deployed across all client and lab nodes
-- [x] Subnet routing configured via Pi-hole node with IP forwarding enabled
-- [x] NAT implemented for return traffic to overlay clients
-- [x] Tag-based ACL policies applied and validated
-- [x] Remote access confirmed from external networks
+- Tailscale deployed on all client and lab nodes
+- Pi-hole configured as subnet router with IP forwarding and NAT
+- Tag-based ACLs applied and validated against all three access tiers
+- Remote access verified from external networks
 
 ---
 
 ## Operational Notes
 
-- Tailscale auth state is independent of system uptime — nodes may require re-auth after reimage
-- Subnet routing requires route advertisement on the router **and** `--accept-routes` on each client
-- NAT is required when upstream devices have no awareness of the `100.x.x.x` overlay range
-- Tag assignments must be reapplied after node re-authentication — ACL enforcement depends on tag consistency
+| Condition | Behavior |
+|---|---|
+| Node reboot | Tailscale auth persists — no re-auth required |
+| Node reimage | Re-auth required — reapply tags and route flags |
+| Route missing on client | Run `tailscale up --accept-routes` |
+| Tag drift after re-auth | ACL silently blocks — reapply tags immediately |
+| NAT not applied | Return traffic drops — MASQUERADE rule required on LAN interface |
 
 ---
 
-## Current Capabilities
+## Key Design Decisions
 
-- Remote SSH access to internal hosts via overlay
-- Secure access to observability stack (Grafana, Prometheus)
-- Identity-based network segmentation with tag-scoped ACLs
-- DNS filtering via Pi-hole across all enrolled nodes
-- No dependency on traditional VPN infrastructure
+**No inbound ports.** The edge firewall has no open ports. All access initiates outbound from the client through the Tailscale coordination server — the internal network is never directly reachable from the internet.
+
+**Subnet routing over exit node.** Only traffic destined for `192.168.10.0/24` traverses the overlay. This reduces latency and limits the blast radius of a compromised node.
+
+**Pi-hole as subnet router.** Centralizes DNS filtering and subnet advertisement on a single lightweight node. All enrolled clients resolve DNS through Pi-hole regardless of physical location.
+
+**Tag-based segmentation over firewall rules.** Access policy lives in the Tailscale ACL — not iptables rules spread across individual hosts. Policy changes take effect instantly across all nodes without touching host-level config.
+
+---
+
+## Capabilities
+
+- Remote SSH to internal hosts from any network
+- Secure access to Grafana and Prometheus dashboards
+- Network-wide DNS filtering via Pi-hole
+- Identity-based segmentation — no shared credentials, no IP allowlists
+
+---
+
+## Roadmap
+
+- [ ] Private service publishing via `securebytes.net`
+- [ ] Reverse proxy with TLS termination (Caddy)
+- [ ] SSO integration via Entra ID
+- [ ] Multi-site subnet routing
 
 ---
 
 ## Visual Proof
 
-### Tailscale Network Overview
+<details>
+<summary>Tailscale node overview</summary>
+
 ![Tailscale Overview](assets/screenshots/tailscale-overview.png)
 
-### Subnet Routing Configuration
+</details>
+
+<details>
+<summary>Subnet routing configuration</summary>
+
 ![Subnet Routing](assets/screenshots/tailscale-subnet-routing.png)
 
-### Remote SSH Access
-![Remote SSH](assets/screenshots/remote-ssh-access.png)
+</details>
 
-### Observability — Grafana
+<details>
+<summary>Remote SSH access</summary>
+
+![SSH](assets/screenshots/remote-ssh-access.png)
+
+</details>
+
+<details>
+<summary>Grafana dashboard</summary>
+
 ![Grafana](assets/screenshots/grafana-overview.png)
 
-### DNS Layer — Pi-hole
+</details>
+
+<details>
+<summary>Pi-hole DNS layer</summary>
+
 ![Pi-hole](assets/screenshots/pihole-dns-overview.png)
 
----
-
-## Next Steps
-
-| # | Item | Notes |
-|---|---|---|
-| 1 | Private service publishing | `securebytes.net` · custom domain routing |
-| 2 | Reverse proxy integration | Caddy or NGINX · TLS termination |
-| 3 | Identity provider integration | SSO / Entra ID · federated authentication |
-| 4 | Multi-site expansion | Additional subnets · mesh topology |
+</details>
 
 ---
 
-## Documentation
-
-| Document | Description |
-|---|---|
-| [`docs/overview.md`](docs/overview.md) | Full architecture overview, topology, and tech stack |
-| [`docs/setup-guide.md`](docs/setup-guide.md) | Step-by-step deployment guide |
-| [`docs/troubleshooting.md`](docs/troubleshooting.md) | Common issues and diagnostic commands |
-| [`configs/tailscale/acl.json`](configs/tailscale/acl.json) | Tailscale ACL policy |
-| [`architecture/README.md`](architecture/README.md) | Network diagrams and access flow |
-
----
-
-## Author
-
-**Gideon Oteng** — [github.com/otengg](https://github.com/otengg)
+**Gideon Oteng** · [github.com/otengg](https://github.com/otengg)
