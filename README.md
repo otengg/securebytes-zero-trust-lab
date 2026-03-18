@@ -113,3 +113,20 @@ Access policies are enforced using Tailscale ACLs with tag-based segmentation.
 ## Author
 
 **Gideon Oteng** — [github.com/otengg](https://github.com/otengg)
+
+---
+## Architecture Diagram
+![Zero Trust Architecture](assets/diagrams/zt-architecture.png)
+
+---
+## Visual Proof
+### Tailscale Network
+![Tailscale](assets/screenshots/tailscale-overview.png)
+### Subnet Routing
+![Subnet Routing](assets/screenshots/tailscale-subnet-routing.png)
+### Remote SSH Access
+![SSH](assets/screenshots/remote-ssh-access.png)
+### Observability (Grafana)
+![Grafana](assets/screenshots/grafana-overview.png)
+### DNS Layer (Pi-hole)
+![Pi-hole](assets/screenshots/pihole-dns-overview.png)
