@@ -1,24 +1,60 @@
 {
   "tagOwners": {
-    "tag:admin": ["autogroup:admin"],
-    "tag:dns": ["autogroup:member"],
-    "tag:monitor": ["autogroup:member"]
+    "tag:admin":   ["autogroup:owner"],
+    "tag:dns":     ["autogroup:owner"],
+    "tag:monitor": ["autogroup:owner"]
   },
+
   "acls": [
     {
       "action": "accept",
-      "src": ["tag:admin"],
-      "dst": ["192.168.10.0/24:*"]
+      "src":    ["tag:admin"],
+      "dst":    ["192.168.10.0/24:*"]
     },
     {
       "action": "accept",
-      "src": ["tag:dns"],
-      "dst": ["192.168.10.10:53"]
+      "src":    ["tag:dns"],
+      "dst":    ["192.168.10.5:53"]
     },
     {
       "action": "accept",
-      "src": ["tag:monitor"],
-      "dst": ["192.168.10.20:3000"]
+      "src":    ["tag:monitor"],
+      "dst":    [
+        "192.168.10.21:3000",
+        "192.168.10.21:9090",
+        "192.168.10.21:9093"
+      ]
+    },
+    {
+      "action": "accept",
+      "src":    ["autogroup:member"],
+      "dst":    ["autogroup:self:*"]
+    }
+  ],
+
+  "ssh": [
+    {
+      "action": "accept",
+      "src":    ["tag:admin"],
+      "dst":    ["tag:admin"],
+      "users":  ["autogroup:nonroot", "root"]
+    }
+  ],
+
+  "tests": [
+    {
+      "src":    "tag:admin",
+      "accept": ["192.168.10.10:22", "192.168.10.22:8000"]
+    },
+    {
+      "src":    "tag:dns",
+      "accept": ["192.168.10.5:53"],
+      "deny":   ["192.168.10.10:22", "192.168.10.21:3000"]
+    },
+    {
+      "src":    "tag:monitor",
+      "accept": ["192.168.10.21:3000", "192.168.10.21:9090"],
+      "deny":   ["192.168.10.10:22", "192.168.10.5:53"]
     }
   ]
 }
