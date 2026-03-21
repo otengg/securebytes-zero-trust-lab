@@ -121,9 +121,6 @@ Full policy: [`acl.json`](acl.json)
 
 </details>
 
-<details>
-
-</details>
 
 <details>
 <summary>Grafana dashboard</summary>
