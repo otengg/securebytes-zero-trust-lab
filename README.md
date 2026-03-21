@@ -29,11 +29,11 @@ Remote Client
 Identity Verification + ACL Evaluation
       │
       ▼
-Subnet Router  ·  192.168.10.5
+Subnet Router  ·  10.0.0.5
       │
       │  NAT + route advertisement
       ▼
-Internal Services  ·  192.168.10.0/24
+Internal Services  ·  10.0.0.0/24
 ```
 
 ![Architecture](assets/zt-architecture.png)
@@ -79,7 +79,7 @@ Full policy: [`acl.json`](acl.json)
 
 **No inbound ports.** The edge firewall has no open ports. All access initiates outbound from the client through the Tailscale coordination server — the internal network is never directly reachable from the internet.
 
-**Subnet routing over exit node.** Only traffic destined for `192.168.10.0/24` traverses the overlay. This reduces latency and limits the blast radius of a compromised node.
+**Subnet routing over exit node.** Only traffic destined for `10.0.0.0/24` traverses the overlay. This reduces latency and limits the blast radius of a compromised node.
 
 **Pi-hole as subnet router.** Centralizes DNS filtering and subnet advertisement on a single lightweight node. All enrolled clients resolve DNS through Pi-hole regardless of physical location.
 
@@ -122,9 +122,6 @@ Full policy: [`acl.json`](acl.json)
 </details>
 
 <details>
-<summary>Remote SSH access</summary>
-
-![SSH](assets/screenshots/remote-ssh-access.png)
 
 </details>
 
